@@ -1,0 +1,40 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('schemas', function (Blueprint $table) {
+            // Update the type enum to include 'struct'
+            $table->dropColumn('type');
+        });
+        
+        Schema::table('schemas', function (Blueprint $table) {
+            $table->enum('type', ['input', 'struct', 'entity'])->default('input')->after('status');
+            $table->index('type');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('schemas', function (Blueprint $table) {
+            $table->dropIndex(['type']);
+            $table->dropColumn('type');
+        });
+        
+        Schema::table('schemas', function (Blueprint $table) {
+            $table->enum('type', ['input', 'entity'])->default('input')->after('status');
+            $table->index('type');
+        });
+    }
+};

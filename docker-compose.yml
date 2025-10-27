@@ -1,0 +1,228 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ai_data_lake
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    logging:
+      driver: "json-file"
+      options:
+        tag: "postgres"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    logging:
+      driver: "json-file"
+      options:
+        tag: "zookeeper"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: true
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 1073741824
+      KAFKA_LOG_SEGMENT_BYTES: 1073741824
+    logging:
+      driver: "json-file"
+      options:
+        tag: "kafka"
+
+  platform:
+    build:
+        context: ./platform/docker/app
+        dockerfile: Dockerfile
+        args:
+            WWWGROUP: '${WWWGROUP:-1000}'
+    image: platform-php-8.4/app
+    extra_hosts:
+        - 'host.docker.internal:host-gateway'
+    ports:
+        - "80:80"
+        - "5173:5173"
+    environment:
+        WWWUSER: '${WWWUSER:-$UID}'
+        LARAVEL_SAIL: 1
+        XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+        XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+        IGNITION_LOCAL_SITES_PATH: '${PWD}/platform'
+        SUPERVISOR_PHP_COMMAND: "/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan octane:start --server=frankenphp --host=0.0.0.0 --admin-port=2019 --port='${APP_PORT:-80}' --watch" 
+        XDG_CONFIG_HOME:  /var/www/html/config 
+        XDG_DATA_HOME:  /var/www/html/data 
+        DB_CONNECTION: pgsql
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_DATABASE: ai_data_lake
+        DB_USERNAME: user
+        DB_PASSWORD: password
+        LOG_CHANNEL: stack
+        LOG_STACK: docker
+        LOG_LEVEL: info
+    volumes:
+        - ./platform:/var/www/html
+    depends_on:
+        - postgres
+    logging:
+      driver: "json-file"
+      options:
+        tag: "platform"
+
+  queue-worker:
+    build:
+        context: ./platform/vendor/laravel/sail/runtimes/8.4
+        dockerfile: Dockerfile
+        args:
+            WWWGROUP: '${WWWGROUP:-1000}'
+    image: sail-8.4/app
+    extra_hosts:
+        - 'host.docker.internal:host-gateway'
+    environment:
+        WWWUSER: '${WWWUSER:-$UID}'
+        LARAVEL_SAIL: 1
+        XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
+        XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
+        IGNITION_LOCAL_SITES_PATH: '${PWD}/platform'
+        SUPERVISOR_PHP_COMMAND: '/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan queue:work --verbose --tries=3 --timeout=90 --sleep=3 --max-jobs=100 --max-time=1800'
+        DB_CONNECTION: pgsql
+        DB_HOST: postgres
+        DB_PORT: 5432
+        DB_DATABASE: ai_data_lake
+        DB_USERNAME: user
+        DB_PASSWORD: password
+        LOG_CHANNEL: stack
+        LOG_STACK: docker
+        LOG_LEVEL: info
+    volumes:
+        - ./platform:/var/www/html
+    restart: unless-stopped
+    depends_on:
+        - postgres
+        - platform
+    logging:
+      driver: "json-file"
+      options:
+        tag: "queue-worker"
+
+  ingestion:
+    build: ./ingestion
+    ports:
+      - "8080:8080"
+    depends_on:
+      - kafka
+      - platform
+    volumes:
+      - ./ingestion:/app
+    environment:
+      - KAFKA_BROKERS=kafka:29092
+      - PLATFORM_API_URL=http://platform
+    logging:
+      driver: "json-file"
+      options:
+        tag: "ingestion"
+
+  soketi:
+    image: quay.io/soketi/soketi:1.6-16-debian
+    container_name: soketi
+    ports:
+      - "6001:6001"
+      - "9601:9601"  # Metrics port
+    environment:
+      SOKETI_DEBUG: '1'
+      SOKETI_METRICS_SERVER_PORT: '9601'
+      SOKETI_DEFAULT_APP_ID: 'ai-data-lake'
+      SOKETI_DEFAULT_APP_KEY: 'app-key'
+      SOKETI_DEFAULT_APP_SECRET: 'app-secret'
+    logging:
+      driver: "json-file"
+      options:
+        tag: "soketi"
+
+#  agent:
+#    build: ./agent
+#    depends_on:
+#      - postgres
+#    volumes:
+#      - ./agent:/app
+
+  # Observability Stack
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_LOG_LEVEL=info
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - loki
+    logging:
+      driver: "json-file"
+      options:
+        tag: "grafana"
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./observability/loki:/etc/loki
+      - loki_data:/loki
+    logging:
+      driver: "json-file"
+      options:
+        tag: "loki"
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: promtail
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./observability/promtail:/etc/promtail
+      - ./platform/storage/logs:/platform-logs:ro
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+    logging:
+      driver: "json-file"
+      options:
+        tag: "promtail"
+
+volumes:
+  postgres_data:
+  grafana_data:
+  loki_data:

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Grouped Nodes Implementation</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-result { margin: 10px 0; padding: 10px; border-left: 3px solid #ccc; }
+        .success { border-color: green; background: #f0fff0; }
+        .info { border-color: blue; background: #f0f8ff; }
+        .error { border-color: red; background: #fff0f0; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Grouped Node Implementation Test</h1>
+
+    <div class="test-result info">
+        <h2>✅ Import and Type Fixes Completed</h2>
+        <ul>
+            <li>Fixed heroicons import by using lucide-react</li>
+            <li>Corrected import paths for utils and types</li>
+            <li>Added type parameters to useNodesState and useEdgesState</li>
+            <li>Created stub functions for missing utilities</li>
+            <li>Fixed DashboardEmpty import to use named export</li>
+        </ul>
+    </div>
+
+    <div class="test-result info">
+        <h2>📦 Key Implementation Changes</h2>
+        <p><strong>DashboardCanvas.tsx (lines 460-491):</strong></p>
+        <pre>
+// ALL source schemas are now converted to grouped nodes
+enrichedFlowNodes.forEach(node => {
+  if (node.type === 'sourceSchema' || node.type === 'sourceSchemaDetail') {
+    // Convert ALL source schemas to grouped nodes
+    const groupedNode: Node = {
+      id: node.id, // Keep the original ID
+      type: 'groupedSourceSchema',
+      position: node.position,
+      data: {
+        schemas: [{
+          id: node.id,
+          label: node.data.label,
+          hash: node.data.hash,
+          tenant: node.data.tenant,
+          fields: node.data.fields || [],
+          pending_records: node.data.pending_records || 0,
+          created_at: node.data.created_at,
+        }],
+        activeSchemaIndex: 0,
+        groupId: node.id,
+        targetEntityId: null,
+      },
+    };
+    localNodesToRender.push(groupedNode);
+  }
+  // Entity nodes remain as detailed nodes
+  // Other node types remain as-is
+});
+        </pre>
+    </div>
+
+    <div class="test-result success">
+        <h2>✅ Build Status</h2>
+        <p>The build completed successfully with all TypeScript errors resolved!</p>
+        <pre>
+✓ 2912 modules transformed.
+✓ built in 1.94s
+        </pre>
+    </div>
+
+    <div class="test-result info">
+        <h2>🎯 Expected Behavior</h2>
+        <ul>
+            <li><strong>All bronze schemas</strong> should now appear as grouped nodes (even single schemas)</li>
+            <li><strong>No individual bronze nodes</strong> should be visible</li>
+            <li><strong>Grouped nodes</strong> should have tab selectors if multiple schemas</li>
+            <li><strong>Connection nodes</strong> (plug socket icons) should appear between bronze and silver for non-formula mappings</li>
+            <li><strong>Formula nodes</strong> should appear for formula-based transformations</li>
+            <li><strong>Edges</strong> should properly connect: Bronze → Connection/Formula → Silver</li>
+        </ul>
+    </div>
+
+    <div class="test-result info">
+        <h2>📋 Node Types Available</h2>
+        <ul>
+            <li><code>groupedSourceSchema</code> - All bronze schemas (replaces individual bronze nodes)</li>
+            <li><code>connectionNode</code> - Plug socket icons for field mappings</li>
+            <li><code>formulaNode</code> - Formula transformation nodes</li>
+            <li><code>entitySchemaDetail</code> - Silver tier entity schemas</li>
+        </ul>
+    </div>
+
+    <script>
+        console.log('Test page loaded. The implementation should now:');
+        console.log('1. Show ALL bronze schemas as grouped nodes');
+        console.log('2. Not show any individual bronze schema nodes');
+        console.log('3. Maintain proper edge connections through connection/formula nodes');
+    </script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+data,event_type,source,timestamp,user_id
+map[action:button_click key:value sample_field:sample_data],frontend_test,test-interface,2025-09-28T14:30:00Z,2
+map[action:button_click fixed:true key:value sample_field:sample_data],final_test,test-interface-fixed,2025-09-28T15:00:00Z,2
+map[message:UUID tenant working! success:true version:1.0],success_test,test-interface-final,2025-09-28T15:30:00Z,2
+map[debug:true test_logging:enabled],debug_logging,debug-test,2025-09-28T16:00:00Z,2

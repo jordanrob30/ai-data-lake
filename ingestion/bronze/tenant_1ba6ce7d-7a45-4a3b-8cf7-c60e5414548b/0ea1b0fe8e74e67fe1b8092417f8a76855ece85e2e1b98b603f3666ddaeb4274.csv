@@ -1,0 +1,2 @@
+changes,email,event_type,timestamp,user_id
+map[name:New Name preferences:map[theme:dark]],updated@example.com,user_profile_update,2025-09-28T14:00:00Z,99999

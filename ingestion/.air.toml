@@ -1,0 +1,5 @@
+[build]
+cmd = "go build -o ./tmp/main main.go"
+bin = "./tmp/main"
+include_ext = ["go"]
+delay = 1000

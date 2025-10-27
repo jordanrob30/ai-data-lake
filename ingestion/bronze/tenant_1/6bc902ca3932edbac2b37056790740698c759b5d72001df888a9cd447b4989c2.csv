@@ -1,0 +1,17 @@
+data,event_type,source,timestamp,user_id
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:26:43.799Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:43:33.632Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:43:43.707Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:45:07.545Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:45:22.005Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:49:05.043Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:51:57.904Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:52:43.054Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T12:57:52.316Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:01:07.333Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:01:22.387Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:04:28.523Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:04:37.203Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:05:20.984Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:05:42.396Z,2
+map[action:button_click key:value sample_field:sample_data],user_action,test-interface,2025-09-28T13:08:57.779Z,2

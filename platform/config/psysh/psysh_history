@@ -1,0 +1,14 @@
+_HiStOrY_V2_
+SchemaMapping::all();
+DB::table('schema_mapping')->get();
+App\134Models\134SchemaMapping::all();
+SchemaMapping::all();
+App\134Models\134SchemaMapping::all();
+Schema::all();
+App\134Models\134Schema::all();
+exit
+App\134Models\134Schema::all();
+App\134Models\134Schema::all();
+App\134Models\134Schema::all()
+App\134Models\134Schema::all()
+App\134Models\134Schema::all()

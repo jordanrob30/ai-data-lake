@@ -1,0 +1,75 @@
+import { usePage, Link, router } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { ReactNode } from 'react';
+
+interface LayoutProps {
+  children: ReactNode;
+}
+
+export default function Layout({ children }: LayoutProps) {
+  const { auth } = usePage().props as any;
+
+  const handleLogout = () => {
+    router.post('/logout');
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            <div className="flex items-center">
+              <Link href="/" className="text-xl font-bold">
+                AI Data Lake
+              </Link>
+            </div>
+            
+            {auth.user && (
+              <div className="flex items-center space-x-4">
+                <Link
+                  href="/dashboard"
+                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Dashboard
+                </Link>
+
+                {auth.user.roles.includes('landlord') && (
+                  <Link
+                    href="/tenant-management"
+                    className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Tenant Management
+                  </Link>
+                )}
+
+                <Link
+                  href="/test-ingestion"
+                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
+                >
+                  Test Ingestion
+                </Link>
+
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">
+                    {auth.user.name}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleLogout}
+                  >
+                    Logout
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
+      
+      <main>{children}</main>
+    </div>
+  );
+}
+
+

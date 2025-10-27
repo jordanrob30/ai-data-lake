@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="lakeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E40AF;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="aiGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Data lake waves (layered) -->
+  <path d="M 20 120 Q 60 110, 100 120 T 180 120 L 180 180 L 20 180 Z" fill="url(#lakeGradient)" opacity="0.3"/>
+  <path d="M 20 140 Q 60 130, 100 140 T 180 140 L 180 180 L 20 180 Z" fill="url(#lakeGradient)" opacity="0.5"/>
+  <path d="M 20 160 Q 60 150, 100 160 T 180 160 L 180 180 L 20 180 Z" fill="url(#lakeGradient)" opacity="0.7"/>
+
+  <!-- AI Neural network nodes -->
+  <circle cx="50" cy="50" r="8" fill="url(#aiGradient)"/>
+  <circle cx="100" cy="40" r="10" fill="url(#aiGradient)"/>
+  <circle cx="150" cy="50" r="8" fill="url(#aiGradient)"/>
+  <circle cx="75" cy="85" r="7" fill="url(#aiGradient)"/>
+  <circle cx="125" cy="85" r="7" fill="url(#aiGradient)"/>
+
+  <!-- Connection lines (neural network style) -->
+  <line x1="50" y1="50" x2="75" y2="85" stroke="url(#aiGradient)" stroke-width="2" opacity="0.6"/>
+  <line x1="100" y1="40" x2="75" y2="85" stroke="url(#aiGradient)" stroke-width="2" opacity="0.6"/>
+  <line x1="100" y1="40" x2="125" y2="85" stroke="url(#aiGradient)" stroke-width="2" opacity="0.6"/>
+  <line x1="150" y1="50" x2="125" y2="85" stroke="url(#aiGradient)" stroke-width="2" opacity="0.6"/>
+
+  <!-- Data flow arrows pointing down to lake -->
+  <path d="M 75 95 L 75 110 L 70 105 M 75 110 L 80 105" stroke="#10B981" stroke-width="2" fill="none" opacity="0.8"/>
+  <path d="M 125 95 L 125 110 L 120 105 M 125 110 L 130 105" stroke="#10B981" stroke-width="2" fill="none" opacity="0.8"/>
+</svg>

@@ -1,0 +1,43 @@
+# General ignores
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.temp
+
+# Docker ignores
+*.docker
+docker-compose.override.yml
+
+# Laravel (platform) ignores
+/platform/vendor/
+/platform/node_modules/
+/platform/npm-debug.log
+/platform/yarn-error.log
+/platform/.env
+/platform/public/hot
+
+# Go (ingestion) ignores
+/ingestion/*.exe
+/ingestion/*.exe~
+/ingestion/*.dll
+/ingestion/*.so
+/ingestion/*.dylib
+/ingestion/bin/
+/ingestion/Gopkg.lock
+/ingestion/vendor/
+
+# LangChain (agent, assuming Python)
+/agent/*.pyc
+/agent/*.pyo
+/agent/__pycache__/
+/agent/*.egg-info/
+/agent/.env
+/agent/venv/
+
+# Build artifacts and volumes
+/build/
+/dist/
+/data/
+.idea
+

@@ -1,0 +1,2 @@
+email,event_type,metadata,timestamp,user_id
+newuser@example.com,user_signup,map[campaign:spring2025 source:web],2025-09-28T12:00:00Z,12345

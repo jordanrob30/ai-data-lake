@@ -1,0 +1,35 @@
+FROM laravelsail/php84-composer:latest
+
+WORKDIR /var/www/html
+
+# Install Node.js for nodemon (hot reload)
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Install supervisor for process management
+RUN apt-get update && apt-get install -y supervisor
+
+# Install nodemon globally for hot reload
+RUN npm install -g nodemon
+
+# Copy supervisor configuration
+COPY supervisor-queue.conf /etc/supervisor/conf.d/laravel-queue.conf
+
+# Copy application files
+COPY . .
+
+# Install PHP dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Set permissions
+RUN chown -R sail:sail /var/www/html \
+    && chmod -R 755 /var/www/html/storage \
+    && chmod -R 755 /var/www/html/bootstrap/cache
+
+# Create log directories
+RUN mkdir -p /var/www/html/storage/logs
+
+USER sail
+
+# Start supervisor to manage queue processes
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
