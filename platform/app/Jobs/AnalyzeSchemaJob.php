@@ -43,6 +43,12 @@ class AnalyzeSchemaJob implements ShouldQueue
 
             Log::info('Starting AI schema analysis', ['schema_id' => $this->schemaId]);
 
+            // Update status to processing
+            $schema->update(['ai_analysis_status' => 'processing']);
+
+            // Load tenant relationship for broadcast
+            $schema->load('tenant');
+
             // Broadcast that analysis has started
             try {
                 Log::info('About to broadcast started event', [
@@ -51,7 +57,9 @@ class AnalyzeSchemaJob implements ShouldQueue
                 ]);
 
                 broadcast(new SchemaAnalysisEvent('started', $schema, [
+                    'name' => $schema->name,
                     'hash' => $schema->hash,
+                    'tenant' => $schema->tenant->name ?? 'Unknown',
                     'detected_fields' => $schema->detected_fields,
                 ]))->toOthers();
 
@@ -64,16 +72,31 @@ class AnalyzeSchemaJob implements ShouldQueue
 
             $recommendations = $aiService->analyzeSchema($schema);
 
-            $schema->update([
+            // Update schema with AI recommendations including the improved name
+            $updateData = [
                 'ai_recommendations' => $recommendations,
                 'ai_analysis_status' => 'completed',
                 'ai_analyzed_at' => now(),
                 'ai_analysis_error' => null,
-            ]);
+            ];
+
+            // Update the schema name if AI provided a better one
+            if (!empty($recommendations['source_schema_name'])) {
+                $updateData['name'] = $recommendations['source_schema_name'];
+                Log::info('Updating bronze schema name based on AI recommendation', [
+                    'schema_id' => $this->schemaId,
+                    'old_name' => $schema->name,
+                    'new_name' => $recommendations['source_schema_name'],
+                ]);
+            }
+
+            $schema->update($updateData);
 
             Log::info('AI schema analysis completed successfully', [
                 'schema_id' => $this->schemaId,
                 'action' => $recommendations['action'] ?? 'unknown',
+                'bronze_name' => $recommendations['source_schema_name'] ?? $schema->name,
+                'silver_name' => $recommendations['entity_name'] ?? 'unknown',
             ]);
 
             // Automatically create the canonical entity and mapping
@@ -87,6 +110,7 @@ class AnalyzeSchemaJob implements ShouldQueue
                 ]);
 
                 // Reload schema to get updated relationships
+                $schema->load('tenant');
                 $schema->refresh();
 
                 // Broadcast that analysis completed with schema and entity data
@@ -97,6 +121,7 @@ class AnalyzeSchemaJob implements ShouldQueue
                         'name' => $schema->name,
                         'type' => $schema->type,
                         'status' => $schema->status,
+                        'tenant' => $schema->tenant->name ?? 'Unknown',
                         'detected_fields' => $schema->detected_fields,
                         'created_at' => $schema->created_at->format('Y-m-d'),
                     ],

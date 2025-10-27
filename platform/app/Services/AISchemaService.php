@@ -195,7 +195,8 @@ Analyze the incoming schema and provide recommendations in the following JSON fo
 {
   "action": "map_to_existing" | "create_new",
   "entity_id": null or existing entity ID (if mapping to existing),
-  "entity_name": "Suggested entity name",
+  "entity_name": "Suggested silver/canonical entity name in PascalCase (e.g., Customer, Order, Product, Transaction)",
+  "source_schema_name": "Descriptive name for the bronze/source schema that indicates its origin and type (e.g., shopify_orders, stripe_payments, salesforce_contacts, csv_customer_import)",
   "similarity_score": 0-100 (only if mapping to existing),
   "reasoning": "Detailed explanation of why this recommendation was made",
   "canonical_schema": {
@@ -254,6 +255,17 @@ Analyze the incoming schema and provide recommendations in the following JSON fo
 - **Consistent Naming**: Use explicit, descriptive snake_case (customer_first_name not cust_fname)
 - **Proper Data Types**: Use specific types (email, url, phone) not generic strings
 - **Design for Reusability**: Create entities that multiple data sources can map to
+
+**Naming Guidelines:**
+- **Entity Names (Silver/Canonical)**: Use PascalCase, singular form, business-focused names
+  - Good: Customer, Order, Product, Transaction, Invoice, Payment
+  - Bad: customers_table, OrderData, user_info
+- **Source Schema Names (Bronze)**: Use snake_case, indicate source system and data type
+  - Good: shopify_orders, stripe_payments, salesforce_leads, csv_customer_upload, api_product_catalog
+  - Bad: data1, schema_xyz, test_data
+  - Include the source system when identifiable (shopify_, stripe_, salesforce_)
+  - Include the data type/entity (orders, payments, customers)
+  - Be descriptive enough that someone can understand the data origin
 
 ### 3. Common Entity Patterns (Use These as Templates)
 

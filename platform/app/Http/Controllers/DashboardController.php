@@ -24,11 +24,23 @@ class DashboardController extends Controller
 
         $schemas = $schemasQuery->get();
 
+        // Get analyzing schemas (schemas currently being analyzed by AI or waiting to be analyzed)
+        $analyzingSchemasQuery = Schema::with(['tenant'])
+            ->where('status', 'pending')
+            ->whereIn('ai_analysis_status', ['pending', 'processing']) // Show both pending and processing as analyzing
+            ->doesntHave('sourceMappings');
+
+        if (!$user->hasRole('landlord')) {
+            $analyzingSchemasQuery->where('tenant_id', $user->tenant_id);
+        }
+
+        $analyzingSchemas = $analyzingSchemasQuery->get();
+
         // Get pending schemas (schemas without mappings that need confirmation)
-        // Only show schemas after AI analysis completes (not during analysis)
+        // Only show schemas after AI analysis completes or is disabled
         $pendingSchemasQuery = Schema::with(['tenant'])
             ->where('status', 'pending')
-            ->whereIn('ai_analysis_status', ['completed', 'failed', 'disabled']) // Only show after AI finishes
+            ->whereIn('ai_analysis_status', ['completed', 'failed', 'disabled']) // Only completed/failed/disabled
             ->doesntHave('sourceMappings');
 
         if (!$user->hasRole('landlord')) {
@@ -293,6 +305,25 @@ class DashboardController extends Controller
             'name' => $entity->name,
             'fields' => $entity->detected_fields ?? [],
         ])->values()->toArray();
+
+        // Add analyzing schemas (schemas being analyzed by AI)
+        foreach ($analyzingSchemas as $analyzingSchema) {
+            $nodes[] = [
+                'id' => "analyzing-{$analyzingSchema->id}",
+                'type' => 'analyzingSchema',
+                'data' => [
+                    'label' => $analyzingSchema->name ?? "Schema {$analyzingSchema->hash}",
+                    'hash' => $analyzingSchema->hash,
+                    'tenant' => $analyzingSchema->tenant->name ?? 'Unknown',
+                    'fields' => $analyzingSchema->detected_fields ?? [],
+                    'pending_records' => $analyzingSchema->pending_records ?? 0,
+                    'created_at' => $analyzingSchema->created_at->format('Y-m-d'),
+                    'status' => 'analyzing',
+                    'schema_id' => $analyzingSchema->id,
+                ],
+                'position' => ['x' => 0, 'y' => 0],
+            ];
+        }
 
         // Add pending schemas (need confirmation/mapping)
         foreach ($pendingSchemas as $pendingSchema) {

@@ -109,7 +109,7 @@ services:
         XDEBUG_MODE: '${SAIL_XDEBUG_MODE:-off}'
         XDEBUG_CONFIG: '${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}'
         IGNITION_LOCAL_SITES_PATH: '${PWD}/platform'
-        SUPERVISOR_PHP_COMMAND: '/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan queue:work --verbose --tries=3 --timeout=90 --sleep=3 --max-jobs=100 --max-time=1800'
+        SUPERVISOR_PHP_COMMAND: '/usr/bin/php -d variables_order=EGPCS /var/www/html/artisan queue:listen --verbose --timeout 90'
         DB_CONNECTION: pgsql
         DB_HOST: postgres
         DB_PORT: 5432

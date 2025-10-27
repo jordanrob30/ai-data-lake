@@ -24,6 +24,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { router, usePage } from '@inertiajs/react';
 import { RotateCw } from 'lucide-react';
+import Echo from '../../echo';
 import { applyLayout } from '../../utils/layoutHelpers';
 import SourceSchemaNode from '../FlowNodes/SourceSchemaNode';
 import EntitySchemaNode from '../FlowNodes/EntitySchemaNode';
@@ -486,6 +487,172 @@ export const DashboardCanvas: React.FC<DashboardCanvasProps> = ({
       window.removeEventListener('autoMapFields', handleAutoMapFields);
     };
   }, [addNewEntityFromSchema, addExistingEntityNode, autoMapFields, convertEdgeToFormula]);
+
+  // Listen for Laravel Echo events for schema analysis
+  useEffect(() => {
+    if (!tenantId) {
+      console.log('[DashboardCanvas] No tenant ID, skipping Echo setup');
+      return;
+    }
+
+    console.log('[DashboardCanvas] Setting up Echo listener for tenant:', tenantId);
+
+    // Subscribe to tenant-specific channel
+    const channel = Echo.channel(`tenant.${tenantId}.schemas`);
+
+    // Listen for schema analysis events
+    const handleSchemaAnalysis = (event: any) => {
+      console.log('[DashboardCanvas] Received schema analysis event:', event);
+
+      if (event.status === 'started') {
+        // Show analyzing state - this may be triggered while already showing analyzing node
+        setNodes((currentNodes) => {
+          const analyzingNodeId = `analyzing-${event.schema_id}`;
+
+          // Check if analyzing node already exists
+          const existingIndex = currentNodes.findIndex(n => n.id === analyzingNodeId);
+
+          if (existingIndex >= 0) {
+            // Already showing as analyzing, just update the data if needed
+            const newNodes = [...currentNodes];
+            newNodes[existingIndex] = {
+              ...currentNodes[existingIndex],
+              data: {
+                ...currentNodes[existingIndex].data,
+                label: event.data?.name || currentNodes[existingIndex].data.label,
+                hash: event.data?.hash || currentNodes[existingIndex].data.hash,
+                tenant: event.data?.tenant || currentNodes[existingIndex].data.tenant,
+                fields: event.data?.detected_fields || currentNodes[existingIndex].data.fields,
+                status: 'analyzing',
+              },
+            };
+            return newNodes;
+          } else {
+            // This shouldn't normally happen since analyzing nodes are loaded from backend
+            // But add it just in case
+            console.log('[DashboardCanvas] Adding analyzing node for schema', event.schema_id);
+            const analyzingNode: Node = {
+              id: analyzingNodeId,
+              type: 'analyzingSchema',
+              position: { x: 100, y: 100 },
+              data: {
+                label: event.data?.name || `Schema ${event.data?.hash || ''}`,
+                hash: event.data?.hash || '',
+                tenant: event.data?.tenant || '',
+                fields: event.data?.detected_fields || [],
+                schema_id: event.schema_id,
+                status: 'analyzing',
+              },
+            };
+            return [...currentNodes, analyzingNode];
+          }
+        });
+      } else if (event.status === 'completed') {
+        // Handle completion - replace analyzing node with bronze and silver schemas
+        console.log('[DashboardCanvas] Schema analysis completed', event);
+
+        if (event.data?.bronze_schema && event.data?.silver_entity) {
+          setNodes((currentNodes) => {
+            const analyzingNodeId = `analyzing-${event.schema_id}`;
+
+            // Remove the analyzing node
+            const filteredNodes = currentNodes.filter(n => n.id !== analyzingNodeId);
+
+            // Add the bronze schema node
+            const bronzeNode: Node = {
+              id: `schema-${event.data.bronze_schema.id}`,
+              type: 'sourceSchemaDetail',
+              position: { x: 100, y: 100 },
+              data: {
+                label: event.data.bronze_schema.name || `Schema ${event.data.bronze_schema.hash}`,
+                hash: event.data.bronze_schema.hash,
+                tenant: event.data.bronze_schema.tenant || '',
+                fields: event.data.bronze_schema.detected_fields || [],
+                pending_records: 0,
+                created_at: event.data.bronze_schema.created_at,
+                status: event.data.bronze_schema.status,
+              },
+            };
+
+            // Add the silver entity node
+            const silverNode: Node = {
+              id: `entity-${event.data.silver_entity.id}`,
+              type: 'entitySchemaDetail',
+              position: { x: 400, y: 100 },
+              data: {
+                label: event.data.silver_entity.name,
+                fields: event.data.silver_entity.detected_fields || [],
+                type: event.data.silver_entity.type,
+              },
+            };
+
+            // Add both nodes
+            return [...filteredNodes, bronzeNode, silverNode];
+          });
+
+          // Add edges after nodes are added
+          setTimeout(() => {
+            if (event.data?.mappings_count && event.data.mappings_count > 0) {
+              setEdges((currentEdges) => {
+                const newEdge: Edge = {
+                  id: `edge-${event.data.bronze_schema.id}-${event.data.silver_entity.id}`,
+                  source: `schema-${event.data.bronze_schema.id}`,
+                  target: `entity-${event.data.silver_entity.id}`,
+                  type: 'staggered',
+                  animated: false,
+                  label: `${event.data.mappings_count} fields`,
+                  markerEnd: {
+                    type: 'arrowclosed',
+                    color: '#6366f1',
+                  },
+                  style: {
+                    stroke: '#6366f1',
+                    strokeWidth: 2,
+                  },
+                };
+                return [...currentEdges, newEdge];
+              });
+            }
+
+            // Trigger layout update
+            handleAutoLayout();
+          }, 200);
+        } else {
+          // Fallback to refresh if data is incomplete
+          setNodes((currentNodes) => {
+            const analyzingNodeId = `analyzing-${event.schema_id}`;
+            return currentNodes.filter(n => n.id !== analyzingNodeId);
+          });
+
+          setTimeout(() => {
+            router.reload({ only: ['flowData', 'pendingSchemas', 'stats'] });
+          }, 100);
+        }
+      } else if (event.status === 'failed') {
+        // Remove analyzing node and refresh to show proper state
+        setNodes((currentNodes) => {
+          const analyzingNodeId = `analyzing-${event.schema_id}`;
+          return currentNodes.filter(n => n.id !== analyzingNodeId);
+        });
+
+        console.error('[DashboardCanvas] Schema analysis failed:', event.data?.error);
+
+        // Refresh to show the schema in failed state
+        setTimeout(() => {
+          router.reload({ only: ['flowData', 'pendingSchemas', 'stats'] });
+        }, 100);
+      }
+    };
+
+    channel.listen('.schema.analysis', handleSchemaAnalysis);
+
+    // Cleanup on unmount
+    return () => {
+      console.log('[DashboardCanvas] Cleaning up Echo listener');
+      channel.stopListening('.schema.analysis');
+      Echo.leave(`tenant.${tenantId}.schemas`);
+    };
+  }, [tenantId, setNodes]);
 
   // Apply layout when data changes
   useEffect(() => {
