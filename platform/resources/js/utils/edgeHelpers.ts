@@ -412,6 +412,7 @@ export function generateFieldLevelView(
             formula: formula,
             sourceField: sourceFieldName || '', // Can be empty for constant formulas
             targetField: targetFieldName,
+            sourceSchemaId: originalSourceId, // Track which schema this formula belongs to
             color: typeColor,
             isConstant: isConstantFormula, // Mark as constant formula
           },

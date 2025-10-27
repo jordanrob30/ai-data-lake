@@ -1,4 +1,4 @@
-import { Handle, Position, NodeProps, useReactFlow } from '@xyflow/react';
+import { Handle, Position, NodeProps, useReactFlow, useStore } from '@xyflow/react';
 import { memo, useState, useCallback, useEffect } from 'react';
 import { generateSourceHandleId } from '../../utils/handleIdHelpers';
 
@@ -26,20 +26,167 @@ interface GroupedSourceSchemaData {
 
 const GroupedSourceSchemaNode = ({ data, selected, id }: NodeProps<GroupedSourceSchemaData>) => {
   const [activeIndex, setActiveIndex] = useState(data.activeSchemaIndex || 0);
-  const { setNodes } = useReactFlow();
+  const { setNodes, setEdges, getEdges } = useReactFlow();
+
+  // Use useStore to get edge count for dependency tracking
+  const edgeCount = useStore((state) => state.edges.length);
 
   const activeSchema = data.schemas[activeIndex];
 
   /**
-   * Log when active schema changes
-   * Since we now have handles for all schemas, we don't need to hide edges
+   * Hide edges and intermediate nodes from non-active schemas when switching
    */
   useEffect(() => {
     const activeSchemaId = data.schemas[activeIndex].id;
-    console.log(`[GroupedSourceSchemaNode] Switching to schema ${activeSchemaId} (index ${activeIndex})`);
+    const activeSchemaHash = data.schemas[activeIndex].hash;
+    console.log(`[GroupedSourceSchemaNode] Switching to schema ${activeSchemaId} (hash: ${activeSchemaHash}, index ${activeIndex})`);
+    console.log(`[GroupedSourceSchemaNode] Group node ID: ${id}`);
+    console.log(`[GroupedSourceSchemaNode] Schemas in group:`, data.schemas.map(s => ({ id: s.id, label: s.label })));
 
-    // No longer hiding edges - all schemas have handles so all edges can be visible
-  }, [activeIndex, data.schemas]);
+    // Get current edges to check if they're ready
+    const currentEdges = getEdges();
+    console.log(`[GroupedSourceSchemaNode] Current edge count: ${currentEdges.length}`);
+
+    // If no edges yet, skip the visibility update (will run again when edges are added)
+    if (currentEdges.length === 0) {
+      console.log(`[GroupedSourceSchemaNode] No edges yet, skipping visibility update`);
+      return;
+    }
+
+    // Get all schema IDs in this group
+    const schemaIdsInGroup = data.schemas.map(s => s.id);
+
+    // We need to identify formula/connection nodes by looking at edges
+    // First, collect all formula/connection node IDs that are connected to this grouped node
+    const intermediateNodeIds = new Set<string>();
+    const nodeVisibility = new Map<string, boolean>();
+
+    // Process edges to identify intermediate nodes
+    console.log(`[GroupedSourceSchemaNode] Processing ${currentEdges.length} edges`);
+
+    // First pass: identify intermediate nodes and their visibility
+    currentEdges.forEach(edge => {
+      // Check edges FROM the grouped node
+      if (edge.source === id) {
+        const originalSourceId = edge.data?.originalSourceId;
+        const targetId = edge.target;
+
+        // Check if target is a formula or connection node
+        if (targetId.startsWith('formula-') || targetId.startsWith('connection-')) {
+          intermediateNodeIds.add(targetId);
+
+          console.log(`[GroupedSourceSchemaNode] Found intermediate node: ${targetId}, originalSourceId: ${originalSourceId}`);
+
+          // Determine if this node should be visible
+          if (originalSourceId && schemaIdsInGroup.includes(originalSourceId)) {
+            const shouldBeVisible = originalSourceId === activeSchemaId;
+            nodeVisibility.set(targetId, shouldBeVisible);
+            console.log(`[GroupedSourceSchemaNode] ${targetId} visibility: ${shouldBeVisible} (originalSourceId=${originalSourceId}, activeSchemaId=${activeSchemaId})`);
+          } else {
+            console.log(`[GroupedSourceSchemaNode] ${targetId} originalSourceId (${originalSourceId}) not in group or missing`);
+          }
+        }
+      }
+
+      // Also check for constant-value formula nodes (they have edges TO entities but not FROM bronze schemas)
+      // These formula nodes will have names like formula-saved-1-* or formula-saved-3-*
+      if (edge.source.startsWith('formula-saved-')) {
+        const formulaId = edge.source;
+
+        // Extract the schema number from the formula ID (e.g., formula-saved-1-2 -> schema-1)
+        const match = formulaId.match(/formula-saved-(\d+)-/);
+        if (match) {
+          const schemaNum = match[1];
+          const correspondingSchemaId = `schema-${schemaNum}`;
+
+          // Check if this schema is in our group
+          if (schemaIdsInGroup.includes(correspondingSchemaId)) {
+            // This is a formula node that belongs to one of our schemas
+            if (!intermediateNodeIds.has(formulaId)) {
+              intermediateNodeIds.add(formulaId);
+              const shouldBeVisible = correspondingSchemaId === activeSchemaId;
+              nodeVisibility.set(formulaId, shouldBeVisible);
+              console.log(`[GroupedSourceSchemaNode] Found constant formula: ${formulaId}, schema: ${correspondingSchemaId}, visible: ${shouldBeVisible}`);
+            }
+          }
+        }
+      }
+    });
+
+    // Update edge visibility
+    setEdges(edges => edges.map(edge => {
+      // Check if this edge originates from this grouped node
+      if (edge.source === id) {
+        const originalSourceId = edge.data?.originalSourceId;
+
+        // Check if this edge belongs to one of our schemas
+        if (originalSourceId && schemaIdsInGroup.includes(originalSourceId)) {
+          const isFromActiveSchema = originalSourceId === activeSchemaId;
+
+          return {
+            ...edge,
+            hidden: !isFromActiveSchema,
+            style: {
+              ...edge.style,
+              display: isFromActiveSchema ? undefined : 'none',
+              opacity: isFromActiveSchema ? 1 : 0
+            }
+          };
+        }
+      }
+
+      // Also hide/show edges FROM intermediate nodes based on their visibility
+      if (intermediateNodeIds.has(edge.source)) {
+        const shouldBeVisible = nodeVisibility.get(edge.source) ?? true;
+        return {
+          ...edge,
+          hidden: !shouldBeVisible,
+          style: {
+            ...edge.style,
+            display: shouldBeVisible ? undefined : 'none',
+            opacity: shouldBeVisible ? 1 : 0
+          }
+        };
+      }
+
+      // Also check edges that connect TO this grouped node
+      if (edge.target === id) {
+        const originalSourceId = edge.data?.originalSourceId;
+
+        if (originalSourceId && schemaIdsInGroup.includes(originalSourceId)) {
+          const isFromActiveSchema = originalSourceId === activeSchemaId;
+
+          return {
+            ...edge,
+            hidden: !isFromActiveSchema,
+            style: {
+              ...edge.style,
+              display: isFromActiveSchema ? undefined : 'none',
+              opacity: isFromActiveSchema ? 1 : 0
+            }
+          };
+        }
+      }
+
+      return edge;
+    }));
+
+    // Now update node visibility based on what we found
+    console.log(`[GroupedSourceSchemaNode] Updating node visibility. Intermediate nodes:`, Array.from(intermediateNodeIds));
+    console.log(`[GroupedSourceSchemaNode] Node visibility map:`, Array.from(nodeVisibility.entries()));
+
+    setNodes(nodes => nodes.map(node => {
+      if (intermediateNodeIds.has(node.id)) {
+        const shouldBeVisible = nodeVisibility.get(node.id) ?? true;
+        console.log(`[GroupedSourceSchemaNode] Setting node ${node.id} hidden=${!shouldBeVisible}`);
+        return {
+          ...node,
+          hidden: !shouldBeVisible
+        };
+      }
+      return node;
+    }));
+  }, [activeIndex, data.schemas, id, setNodes, setEdges, getEdges, edgeCount]); // Re-run when edge count changes
 
   /**
    * Handle switching between schemas in the group
@@ -161,16 +308,24 @@ const GroupedSourceSchemaNode = ({ data, selected, id }: NodeProps<GroupedSource
       </div>
 
       {/* Hidden handles for all other schemas in the group */}
+      {/* These are needed so React Flow can find the handles, but we'll hide the edges */}
       {data.schemas.map((schema, schemaIndex) => {
         if (schemaIndex === activeIndex) return null; // Skip active schema as it's already rendered above
 
         return schema.fields?.map((field, fieldIndex) => {
           const handleId = generateSourceHandleId(schema.hash, field.name);
           // Position handles to match where visible fields would be
-          // Header (120px) + Schema info (90px) + field position
-          const baseOffset = 210; // 120px header + 90px schema info
-          const fieldHeight = 54; // Height of each field row
-          const topPosition = baseOffset + (fieldIndex * fieldHeight) + (fieldHeight / 2); // Center of field
+          // Calculations based on actual DOM measurements:
+          const containerPadding = 16;
+          const groupHeaderHeight = 75;
+          const activeSchemaHeaderHeight = 75;
+          const fieldHeight = 50;
+          const fieldGap = 4;
+
+          const baseOffset = containerPadding + groupHeaderHeight + activeSchemaHeaderHeight;
+          const fieldOffset = fieldIndex * (fieldHeight + fieldGap);
+          const fieldCenter = fieldHeight / 2;
+          const topPosition = baseOffset + fieldOffset + fieldCenter;
 
           return (
             <Handle
