@@ -3,7 +3,6 @@
  */
 
 import React from 'react';
-import { router } from '@inertiajs/react';
 
 export const DashboardEmpty: React.FC = () => {
   return (
@@ -14,14 +13,11 @@ export const DashboardEmpty: React.FC = () => {
           No Schema Mappings Yet
         </h3>
         <p className="text-gray-600 mb-6 max-w-md">
-          Configure schema mappings from the Confirmations page to see them visualized here.
+          Use the Test Data button in the bottom controls to send sample data and create your first schema mapping.
         </p>
-        <button
-          onClick={() => router.visit('/confirmations')}
-          className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
-        >
-          Go to Confirmations
-        </button>
+        <div className="text-sm text-gray-500">
+          Click the test tube icon in the bottom-left controls to get started
+        </div>
       </div>
     </div>
   );

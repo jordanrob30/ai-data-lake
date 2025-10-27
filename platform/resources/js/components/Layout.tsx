@@ -42,13 +42,6 @@ export default function Layout({ children }: LayoutProps) {
                   </Link>
                 )}
 
-                <Link
-                  href="/test-ingestion"
-                  className="text-gray-700 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium"
-                >
-                  Test Ingestion
-                </Link>
-
                 <div className="flex items-center space-x-2">
                   <span className="text-sm text-gray-600">
                     {auth.user.name}

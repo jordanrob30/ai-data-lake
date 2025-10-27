@@ -1,0 +1,36 @@
+# LangGraph and LangChain dependencies
+langgraph
+langchain
+langchain-aws
+langchain-core
+
+# FastAPI and server
+fastapi
+uvicorn[standard]
+python-multipart
+
+# AWS SDK
+boto3
+aioboto3
+
+# Data validation and serialization
+pydantic>=2.0
+pydantic-settings
+
+# HTTP client for async operations
+httpx
+
+# JSON manipulation (optional, can be removed if causing issues)
+# jsonata
+
+# Development tools
+watchdog
+python-dotenv
+
+# Logging and monitoring
+structlog
+rich
+
+# Testing (optional, for development)
+pytest
+pytest-asyncio

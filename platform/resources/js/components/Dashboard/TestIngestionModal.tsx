@@ -1,32 +1,31 @@
-import { useState } from 'react';
-import { usePage } from '@inertiajs/react';
-import Layout from '../components/Layout';
+import { useState, useEffect } from 'react';
+import { X, Send, Wifi } from 'lucide-react';
 
-interface Props {
-  userTenantId?: string;
+interface TestIngestionModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  auth: any;
 }
 
-const TestIngestion = ({ userTenantId }: Props) => {
-  const { auth } = usePage().props as any;
-  console.log('userTenantId', userTenantId);
-  // Use the injected tenant ID or fall back to auth.user.tenant_id or default to Tenant 1 for testing
+const TestIngestionModal: React.FC<TestIngestionModalProps> = ({ isOpen, onClose, auth }) => {
+  // Use the auth.user.tenant_id or fall back to default for landlord
   const currentTenantId = auth.user?.tenant_id || 'dc5fac73-7fa8-415c-8071-52cc2275b56d'; // Default to Tenant 1 for landlord
   const displayTenantName = auth.user?.tenant_id ? 'Current Tenant' : 'Tenant 1 (Default for Landlord)';
-  
+
   // Predefined data examples
   const dataExamples = {
     'basic': {
       name: 'Basic Event',
       data: {
-    timestamp: new Date().toISOString(),
-    source: 'test-interface',
-    user_id: auth.user?.id,
-    event_type: 'user_action',
-    data: {
-      key: 'value',
-      sample_field: 'sample_data',
-      action: 'button_click'
-    }
+        timestamp: new Date().toISOString(),
+        source: 'test-interface',
+        user_id: auth.user?.id,
+        event_type: 'user_action',
+        data: {
+          key: 'value',
+          sample_field: 'sample_data',
+          action: 'button_click'
+        }
       }
     },
     'stripe_customer': {
@@ -264,6 +263,8 @@ const TestIngestion = ({ userTenantId }: Props) => {
 
   const [selectedExample, setSelectedExample] = useState('basic');
   const [data, setData] = useState(JSON.stringify(dataExamples.basic.data, null, 2));
+  const [sending, setSending] = useState(false);
+  const [response, setResponse] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   // Handle example selection
   const handleExampleChange = (exampleKey: string) => {
@@ -274,14 +275,17 @@ const TestIngestion = ({ userTenantId }: Props) => {
       (selectedData as any).timestamp = new Date().toISOString();
     }
     setData(JSON.stringify(selectedData, null, 2));
+    setResponse(null);
   };
 
   const sendPost = async () => {
+    setSending(true);
+    setResponse(null);
     try {
       const tenantId = currentTenantId;
       const payload = JSON.parse(data);
       payload.timestamp = new Date().toISOString();
-      
+
       const response = await fetch(`http://localhost:8080/tenant/${tenantId}/ingest`, {
         method: 'POST',
         headers: {
@@ -292,179 +296,224 @@ const TestIngestion = ({ userTenantId }: Props) => {
 
       if (response.ok) {
         const result = await response.json();
-        alert(`Success! Schema hash: ${result.schema_hash}`);
+        setResponse({ type: 'success', message: `Success! Schema hash: ${result.schema_hash}` });
       } else {
-        alert('Error: ' + response.statusText);
+        setResponse({ type: 'error', message: `Error: ${response.statusText}` });
       }
     } catch (error) {
       console.error('POST error:', error);
-      alert('Error sending POST: ' + error);
+      setResponse({ type: 'error', message: `Error sending POST: ${error}` });
+    } finally {
+      setSending(false);
     }
   };
 
   const sendWs = () => {
+    setSending(true);
+    setResponse(null);
     try {
       const tenantId = currentTenantId;
       const payload = JSON.parse(data);
       payload.timestamp = new Date().toISOString();
-      
+
       const ws = new WebSocket(`ws://localhost:8080/tenant/${tenantId}/ws`);
       ws.onopen = () => {
         ws.send(JSON.stringify(payload));
-        alert('WebSocket message sent!');
+        setResponse({ type: 'success', message: 'WebSocket message sent!' });
+        setSending(false);
       };
       ws.onerror = (error) => {
         console.error('WebSocket error:', error);
-        alert('WebSocket error: ' + error);
+        setResponse({ type: 'error', message: `WebSocket error: ${error}` });
+        setSending(false);
       };
       ws.onclose = () => {
         console.log('WebSocket connection closed');
       };
     } catch (error) {
       console.error('WebSocket error:', error);
-      alert('Error sending WebSocket: ' + error);
+      setResponse({ type: 'error', message: `Error sending WebSocket: ${error}` });
+      setSending(false);
     }
   };
 
+  // Handle escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, [isOpen]);
+
+  if (!isOpen) return null;
+
   return (
-    <Layout>
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Test Ingestion</h1>
-          <p className="text-gray-600">Test data ingestion with various realistic data shapes and formats</p>
-        </div>
+    <>
+      {/* Backdrop */}
+      <div
+        className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50"
+        onClick={onClose}
+      />
 
-        {/* Tenant Info */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-sm text-blue-700">
-            <strong>Current Tenant:</strong> {currentTenantId} ({displayTenantName}) | 
-            <strong> User:</strong> {auth.user?.name}
-          </p>
-          <p className="text-xs text-blue-600 mt-1">
-            Data will be sent to tenant-specific endpoints. Timestamp will be updated automatically.
-          </p>
-          <p className="text-xs text-blue-500 mt-1">
-            <strong>Webhook URL:</strong> http://localhost:8080/tenant/{currentTenantId}/ingest
-          </p>
-        </div>
+      {/* Modal Drawer */}
+      <div className="fixed right-0 top-0 h-full w-full md:w-3/4 lg:w-2/3 xl:w-3/5 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out">
+        <div className="h-full flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-indigo-50 to-blue-50">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Test Data Ingestion</h2>
+              <p className="text-sm text-gray-600 mt-0.5">Send test data to your ingestion endpoints</p>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/80 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Data Examples Selector */}
-          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-lg shadow border">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Data Examples</h2>
-              <p className="text-sm text-gray-600 mb-4">
-                Choose from realistic data shapes to test different entity mapping scenarios
+          {/* Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {/* Tenant Info */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                <strong>Tenant:</strong> {currentTenantId} ({displayTenantName}) |
+                <strong> User:</strong> {auth.user?.name}
               </p>
-              
-              <div className="space-y-3">
-                {Object.entries(dataExamples).map(([key, example]) => (
-                  <button
-                    key={key}
-                    onClick={() => handleExampleChange(key)}
-                    className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                      selectedExample === key
-                        ? 'bg-indigo-50 border-indigo-200 text-indigo-900'
-                        : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="font-medium text-sm">{example.name}</div>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {key === 'stripe_customer' && 'Customer record with address, metadata'}
-                      {key === 'hubspot_contact' && 'Contact with properties, analytics data'}
-                      {key === 'ecommerce_order' && 'Order with items, customer, payment info'}
-                      {key === 'user_analytics' && 'Page view event with UTM, device data'}
-                      {key === 'support_ticket' && 'Support ticket with interactions, SLA'}
-                      {key === 'basic' && 'Simple event with nested data object'}
-                    </div>
-                  </button>
-                ))}
+              <p className="text-xs text-blue-600 mt-1">
+                Timestamp will be updated automatically on send
+              </p>
+              <div className="text-xs text-blue-500 mt-2 space-y-1">
+                <p><strong>POST:</strong> <code className="bg-white/70 px-1.5 py-0.5 rounded">http://localhost:8080/tenant/{currentTenantId}/ingest</code></p>
+                <p><strong>WebSocket:</strong> <code className="bg-white/70 px-1.5 py-0.5 rounded">ws://localhost:8080/tenant/{currentTenantId}/ws</code></p>
+              </div>
+            </div>
+
+            {/* Response Message */}
+            {response && (
+              <div className={`mb-6 p-4 rounded-lg border ${
+                response.type === 'success'
+                  ? 'bg-green-50 border-green-200 text-green-700'
+                  : 'bg-red-50 border-red-200 text-red-700'
+              }`}>
+                <p className="text-sm font-medium">{response.message}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Data Examples Selector */}
+              <div className="lg:col-span-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Data Examples</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Choose from realistic data shapes
+                </p>
+
+                <div className="space-y-2">
+                  {Object.entries(dataExamples).map(([key, example]) => (
+                    <button
+                      key={key}
+                      onClick={() => handleExampleChange(key)}
+                      className={`w-full text-left p-3 rounded-lg border transition-all ${
+                        selectedExample === key
+                          ? 'bg-indigo-50 border-indigo-300 shadow-sm'
+                          : 'bg-white border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="font-medium text-sm">{example.name}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {key === 'stripe_customer' && 'Customer with address, metadata'}
+                        {key === 'hubspot_contact' && 'Contact with properties, analytics'}
+                        {key === 'ecommerce_order' && 'Order with items, payment info'}
+                        {key === 'user_analytics' && 'Page view with UTM, device data'}
+                        {key === 'support_ticket' && 'Ticket with interactions, SLA'}
+                        {key === 'basic' && 'Simple event with nested data'}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-gray-200">
-                <h3 className="text-sm font-medium text-gray-900 mb-2">Current Selection</h3>
-                <div className="bg-indigo-50 p-3 rounded border border-indigo-200">
-                  <div className="text-sm font-medium text-indigo-900">
-                    {dataExamples[selectedExample as keyof typeof dataExamples].name}
+              {/* JSON Editor */}
+              <div className="lg:col-span-2">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">JSON Data</h3>
+                  <div className="text-sm text-gray-500">
+                    {Object.keys(JSON.parse(data) || {}).length} fields
                   </div>
-                  <div className="text-xs text-indigo-700 mt-1">
-                    Fields: {Object.keys(dataExamples[selectedExample as keyof typeof dataExamples].data).length}
-                  </div>
+                </div>
+
+                <textarea
+                  className="w-full h-96 p-4 border border-gray-300 rounded-lg font-mono text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                  value={data}
+                  onChange={(e) => {
+                    setData(e.target.value);
+                    setResponse(null);
+                  }}
+                  placeholder="Enter JSON data to send..."
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex gap-4">
+              <button
+                className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={sendPost}
+                disabled={sending}
+              >
+                <Send className="w-4 h-4" />
+                Send POST Request
+              </button>
+              <button
+                className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={sendWs}
+                disabled={sending}
+              >
+                <Wifi className="w-4 h-4" />
+                Send WebSocket
+              </button>
+            </div>
+
+            {/* Tips Section */}
+            <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+              <h4 className="text-base font-semibold text-yellow-800 mb-3">Testing Tips</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-yellow-700">
+                <div>
+                  <strong>Stripe Customer:</strong> Test nested address objects
+                </div>
+                <div>
+                  <strong>HubSpot Contact:</strong> Test complex properties
+                </div>
+                <div>
+                  <strong>E-commerce Order:</strong> Test arrays and nested objects
+                </div>
+                <div>
+                  <strong>User Analytics:</strong> Test UTM and device info
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* JSON Editor and Actions */}
-          <div className="lg:col-span-2">
-            <div className="bg-white p-6 rounded-lg shadow border">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-semibold text-gray-900">JSON Data</h2>
-                <div className="text-sm text-gray-500">
-                  Edit the JSON below or select an example
-                </div>
-              </div>
-              
-        <textarea
-                className="w-full h-96 p-4 border border-gray-300 rounded-lg mb-6 font-mono text-sm bg-gray-50 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-          value={data}
-          onChange={(e) => setData(e.target.value)}
-          placeholder="Enter JSON data to send..."
-        />
-              
-              <div className="flex gap-4 mb-6">
-          <button
-                  className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            onClick={sendPost}
-          >
-                  📡 Send POST Request
-          </button>
-          <button
-                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium"
-            onClick={sendWs}
-          >
-                  🔌 Send WebSocket
-          </button>
-              </div>
-
-              <div className="bg-gray-50 p-4 rounded-lg border">
-                <h3 className="text-sm font-semibold text-gray-700 mb-2">Endpoint Information</h3>
-                <div className="space-y-1 text-sm text-gray-600">
-                  <div><strong>POST:</strong> <code className="bg-white px-2 py-1 rounded text-xs">http://localhost:8080/tenant/{currentTenantId}/ingest</code></div>
-                  <div><strong>WebSocket:</strong> <code className="bg-white px-2 py-1 rounded text-xs">ws://localhost:8080/tenant/{currentTenantId}/ws</code></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tips Section */}
-        <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-yellow-800 mb-3">💡 Testing Tips</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-yellow-700">
-            <div>
-              <strong>Stripe Customer:</strong> Test nested address objects and metadata mapping
-            </div>
-            <div>
-              <strong>HubSpot Contact:</strong> Test complex properties object with many fields
-            </div>
-            <div>
-              <strong>E-commerce Order:</strong> Test arrays of items and multiple nested objects
-            </div>
-            <div>
-              <strong>User Analytics:</strong> Test UTM parameters and device information
-            </div>
-            <div>
-              <strong>Support Ticket:</strong> Test arrays of interactions and nested customer data
-            </div>
-            <div>
-              <strong>Basic Event:</strong> Simple structure for quick testing
             </div>
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 };
 
-export default TestIngestion;
+export default TestIngestionModal;

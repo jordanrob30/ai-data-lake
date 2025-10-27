@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\AnalyzeSchemaJob;
 use App\Models\Schema;
-use App\Services\AISchemaService;
 use App\Services\SchemaComparisonService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -81,16 +80,12 @@ class SchemaController extends Controller
             'status' => 'pending',
         ]);
 
-        // Automatically trigger AI analysis in the background
+        // Automatically trigger Thalamus analysis in the background
         try {
-            $aiService = app(AISchemaService::class);
-            if ($aiService->isEnabled()) {
-                // Dispatch the job to analyze this schema
-                AnalyzeSchemaJob::dispatch($schema->id);
-                Log::info('AI analysis job dispatched', ['schema_id' => $schema->id]);
-            }
+            AnalyzeSchemaJob::dispatch($schema->id);
+            Log::info('Thalamus analysis job dispatched', ['schema_id' => $schema->id]);
         } catch (\Exception $e) {
-            Log::error('Failed to dispatch AI analysis job', [
+            Log::error('Failed to dispatch Thalamus analysis job', [
                 'schema_id' => $schema->id,
                 'error' => $e->getMessage(),
             ]);

@@ -4,12 +4,14 @@
 
 import React from 'react';
 import { useReactFlow } from '@xyflow/react';
+import { TestTube2 } from 'lucide-react';
 
 interface DashboardLegendProps {
   onAutoLayout: () => void;
+  onOpenTestIngestion: () => void;
 }
 
-export const DashboardLegend: React.FC<DashboardLegendProps> = ({ onAutoLayout }) => {
+export const DashboardLegend: React.FC<DashboardLegendProps> = ({ onAutoLayout, onOpenTestIngestion }) => {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
 
   return (
@@ -77,6 +79,18 @@ export const DashboardLegend: React.FC<DashboardLegendProps> = ({ onAutoLayout }
             </svg>
           </button>
         </div>
+
+        {/* Divider */}
+        <div className="h-6 w-px bg-gray-300" />
+
+        {/* Test Data Button */}
+        <button
+          onClick={onOpenTestIngestion}
+          className="p-1.5 hover:bg-gray-100 rounded transition-colors group"
+          title="Test Data Ingestion"
+        >
+          <TestTube2 className="w-4 h-4 text-gray-600 group-hover:text-gray-900" />
+        </button>
 
         {/* Help Text */}
         <div className="flex items-center space-x-2 ml-2 text-gray-500">

@@ -25,9 +25,9 @@ class DashboardController extends Controller
         $schemas = $schemasQuery->get();
 
         // Get analyzing schemas (schemas currently being analyzed by AI or waiting to be analyzed)
+        // Include ALL pending schemas as "analyzing" since we're using Thalamus for all analysis now
         $analyzingSchemasQuery = Schema::with(['tenant'])
             ->where('status', 'pending')
-            ->whereIn('ai_analysis_status', ['pending', 'processing']) // Show both pending and processing as analyzing
             ->doesntHave('sourceMappings');
 
         if (!$user->hasRole('landlord')) {
@@ -36,18 +36,8 @@ class DashboardController extends Controller
 
         $analyzingSchemas = $analyzingSchemasQuery->get();
 
-        // Get pending schemas (schemas without mappings that need confirmation)
-        // Only show schemas after AI analysis completes or is disabled
-        $pendingSchemasQuery = Schema::with(['tenant'])
-            ->where('status', 'pending')
-            ->whereIn('ai_analysis_status', ['completed', 'failed', 'disabled']) // Only completed/failed/disabled
-            ->doesntHave('sourceMappings');
-
-        if (!$user->hasRole('landlord')) {
-            $pendingSchemasQuery->where('tenant_id', $user->tenant_id);
-        }
-
-        $pendingSchemas = $pendingSchemasQuery->get();
+        // No longer show pending schemas as separate nodes - they all show as analyzing
+        $pendingSchemas = collect([]);
 
         // Build visualization data
         $nodes = [];
@@ -325,26 +315,7 @@ class DashboardController extends Controller
             ];
         }
 
-        // Add pending schemas (need confirmation/mapping)
-        foreach ($pendingSchemas as $pendingSchema) {
-            $nodes[] = [
-                'id' => "pending-{$pendingSchema->id}",
-                'type' => 'pendingSchema',
-                'data' => [
-                    'label' => $pendingSchema->name ?? "Schema {$pendingSchema->hash}",
-                    'hash' => $pendingSchema->hash,
-                    'tenant' => $pendingSchema->tenant->name ?? 'Unknown',
-                    'fields' => $pendingSchema->detected_fields ?? [],
-                    'pending_records' => $pendingSchema->pending_records ?? 0,
-                    'created_at' => $pendingSchema->created_at->format('Y-m-d'),
-                    'status' => 'pending',
-                    'sample_data' => $pendingSchema->sample_data,
-                    'schema_id' => $pendingSchema->id,
-                    'available_entities' => $availableEntities,
-                ],
-                'position' => ['x' => 0, 'y' => 0],
-            ];
-        }
+        // No longer adding pending schema nodes - they're all shown as analyzing
 
         // Add standalone entity schema nodes to the graph
 

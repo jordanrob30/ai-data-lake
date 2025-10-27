@@ -1,0 +1,45 @@
+{
+  "incoming_schema": {
+    "id": 1,
+    "hash": "test123",
+    "name": "customer_data",
+    "tenant_id": 1,
+    "detected_fields": [
+      {
+        "name": "full_name",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "email",
+        "type": "string",
+        "required": true
+      },
+      {
+        "name": "phone",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "customer_address",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "sample_data": [
+      {
+        "full_name": "John Smith",
+        "email": "john.smith@example.com",
+        "phone": "555-123-4567",
+        "customer_address": "123 Main St, New York, NY 10001"
+      },
+      {
+        "full_name": "Jane Doe",
+        "email": "jane.doe@example.com",
+        "phone": "555-987-6543",
+        "customer_address": "456 Oak Ave, Los Angeles, CA 90001"
+      }
+    ]
+  },
+  "existing_entities": []
+}

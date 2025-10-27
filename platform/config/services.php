@@ -40,13 +40,9 @@ return [
         'timeout' => env('INGESTION_SERVICE_TIMEOUT', 5),
     ],
 
-    'bedrock' => [
-        'key' => env('AWS_ACCESS_KEY_ID'),
-        'secret' => env('AWS_SECRET_ACCESS_KEY'),
-        'region' => env('AWS_BEDROCK_REGION', 'us-east-1'),
-        'model_id' => env('AWS_BEDROCK_MODEL_ID', 'anthropic.claude-3-5-sonnet-20241022-v2:0'),
-        'enabled' => env('AI_SCHEMA_ANALYSIS_ENABLED', true),
-        'timeout' => env('AI_SCHEMA_ANALYSIS_TIMEOUT', 30),
+    'thalamus' => [
+        'url' => env('THALAMUS_API_URL', 'http://thalamus:8001'),
+        'timeout' => env('THALAMUS_API_TIMEOUT', 60),
     ],
 
 ];

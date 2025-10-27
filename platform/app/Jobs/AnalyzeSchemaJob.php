@@ -4,7 +4,7 @@ namespace App\Jobs;
 
 use App\Events\SchemaAnalysisEvent;
 use App\Models\Schema;
-use App\Services\AISchemaService;
+use App\Services\ThalamusSchemaService;
 use App\Services\SchemaEntityService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -25,23 +25,20 @@ class AnalyzeSchemaJob implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(AISchemaService $aiService, SchemaEntityService $entityService): void
+    public function handle(ThalamusSchemaService $thalamusService, SchemaEntityService $entityService): void
     {
         try {
             $schema = Schema::find($this->schemaId);
 
             if (!$schema) {
-                Log::error('Schema not found for AI analysis', ['schema_id' => $this->schemaId]);
+                Log::error('Schema not found for analysis', ['schema_id' => $this->schemaId]);
                 return;
             }
 
-            if (!$aiService->isEnabled()) {
-                Log::info('AI analysis is disabled', ['schema_id' => $this->schemaId]);
-                $schema->update(['ai_analysis_status' => 'disabled']);
-                return;
-            }
-
-            Log::info('Starting AI schema analysis', ['schema_id' => $this->schemaId]);
+            Log::info('Starting schema analysis with Thalamus', [
+                'schema_id' => $this->schemaId,
+                'schema_hash' => $schema->hash,
+            ]);
 
             // Update status to processing
             $schema->update(['ai_analysis_status' => 'processing']);
@@ -51,7 +48,7 @@ class AnalyzeSchemaJob implements ShouldQueue
 
             // Broadcast that analysis has started
             try {
-                Log::info('About to broadcast started event', [
+                Log::info('Broadcasting analysis started event', [
                     'schema_id' => $schema->id,
                     'tenant_id' => $schema->tenant_id,
                 ]);
@@ -70,7 +67,8 @@ class AnalyzeSchemaJob implements ShouldQueue
                 ]);
             }
 
-            $recommendations = $aiService->analyzeSchema($schema);
+            // Analyze schema using Thalamus
+            $recommendations = $thalamusService->analyzeSchema($schema);
 
             // Update schema with AI recommendations including the improved name
             $updateData = [
@@ -83,7 +81,7 @@ class AnalyzeSchemaJob implements ShouldQueue
             // Update the schema name if AI provided a better one
             if (!empty($recommendations['source_schema_name'])) {
                 $updateData['name'] = $recommendations['source_schema_name'];
-                Log::info('Updating bronze schema name based on AI recommendation', [
+                Log::info('Updating bronze schema name based on recommendation', [
                     'schema_id' => $this->schemaId,
                     'old_name' => $schema->name,
                     'new_name' => $recommendations['source_schema_name'],
@@ -92,7 +90,7 @@ class AnalyzeSchemaJob implements ShouldQueue
 
             $schema->update($updateData);
 
-            Log::info('AI schema analysis completed successfully', [
+            Log::info('Schema analysis completed successfully', [
                 'schema_id' => $this->schemaId,
                 'action' => $recommendations['action'] ?? 'unknown',
                 'bronze_name' => $recommendations['source_schema_name'] ?? $schema->name,
@@ -145,11 +143,11 @@ class AnalyzeSchemaJob implements ShouldQueue
                     'error' => $e->getMessage(),
                 ]));
 
-                // Don't throw - AI analysis succeeded, entity creation is secondary
+                // Don't throw - analysis succeeded, entity creation is secondary
             }
 
         } catch (\Exception $e) {
-            Log::error('AI schema analysis failed', [
+            Log::error('Schema analysis failed', [
                 'schema_id' => $this->schemaId,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
